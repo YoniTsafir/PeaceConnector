@@ -1,0 +1,21 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <title>Peace Connector</title>
+  </head>
+  <body>
+      <h1>Peace Connector</h1>
+      <p>We connect people in countries of conflict simply based on shared hobbies</p>
+    {% if current_user %}
+      <p>Thank you {{ current_user.name|escape }}!</p>
+      <p><img src="http://graph.facebook.com/{{ current_user.id }}/picture"/></p>
+      <p>We'll match you with someone in a country of<br/>
+         conflict via email as soon as possible</p>
+    {% else %}
+      <p><a href="/auth/login">Log in with Facebook to start the adventure!</a></p>
+    {% endif %}
+      <!-- TODO: add tweet/share on facebook -->
+      <p>Created at the Innovation Israel Hackathon</p>
+  </body>
+</html>

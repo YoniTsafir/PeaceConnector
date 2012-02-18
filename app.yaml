@@ -1,0 +1,12 @@
+application: peaceconnector
+version: 1
+runtime: python
+api_version: 1
+
+handlers:
+- url: /.*
+  script: main.py
+  secure: always
+
+builtins:
+- remote_api: on
