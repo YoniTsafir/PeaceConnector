@@ -2,6 +2,7 @@
 
 FACEBOOK_APP_ID = "105470519580554"
 FACEBOOK_APP_SECRET = "d23ef0731fa99355d36a29994a84d170"
+PEACE_CONNECTOR_EMAIL = "innovationisrael@gmail.com"
 
 import cgi
 import logging
@@ -17,6 +18,8 @@ from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 from google.appengine.ext.webapp import template
 from google.appengine.api import taskqueue
+from google.appengine.api import mail
+
 
 from conflicts_dict import CONFLICTS_DICT
 
@@ -164,6 +167,7 @@ class MatchHandler(webapp.RequestHandler):
                 if (len(in_common) > 0):
                     logging.info("Found a match between '%s' and '%s'", user_to_match.name, user.name)
                     self._send_email(user_to_match, user, in_common)
+                    self._send_email(user, user_to_match, in_common)
                     return
             
         logging.info("Couldn't find a match for '%s'", user_to_match.name)
@@ -175,7 +179,6 @@ class MatchHandler(webapp.RequestHandler):
                 logging.info("Fetching name of common object: " + object_id)
                 parsed_object = json.load(urllib.urlopen("https://graph.facebook.com/" + object_id + "?" +
                                                        urllib.urlencode(dict(access_token=user1.access_token))))
-                logging.info("PARSED: " + str(parsed_object))
                 common_grounds.append("You both %s %s" % (verb, parsed_object["name"]))
 
     def _find_common_grounds(self, user1, user2):
@@ -197,8 +200,19 @@ class MatchHandler(webapp.RequestHandler):
     def _send_email(self, user1, user2, in_common):
         logging.info("Sending email: %s and %s have in common: %s", user1.name, user2.name, in_common)
 
-        #TODO: implement for real
+        email_body_path = os.path.join(os.path.dirname(__file__), "email_template.txt")
+        email_html_path = os.path.join(os.path.dirname(__file__), "email_template.html")
+        args = dict(user1=user1, 
+                    user2=user2,
+                    in_common=in_common,
+                    base_url='http://'+os.environ['HTTP_HOST']+'/')
 
+        message = mail.EmailMessage(sender="Peace Connector <%s>" % (PEACE_CONNECTOR_EMAIL,),
+                                    to="%s <%s>" % (user1.name, user1.email),
+                                    subject="We have found a new match for you at Peace Connector",
+                                    body=template.render(email_body_path, args),
+                                    html=template.render(email_html_path, args))
+        message.send()
     
 def main():
     util.run_wsgi_app(webapp.WSGIApplication([

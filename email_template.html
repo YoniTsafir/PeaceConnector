@@ -1,0 +1,19 @@
+<p>Hey {{ user1.name }},</p>
+<p>We've found a match for you through <a href="{{ base_url }}">PeaceConnector</a>!</p>
+<p>
+<span style="color: purple;font-weight: bolder;">What you have in common:</span><br>
+<ul>
+    {% for i in in_common %}
+    <li>{{ i }}</li>
+    {% endfor %}
+</ul>
+</p>
+<p>
+    Here's your match:<br>
+    <a href="{{ user2.profile_url }}">
+        <img src="http://graph.facebook.com/{{ user2.fb_id }}/picture"/><br>
+        {{ user2.name }} from {{ user2.country }}
+    </a>
+</p>
+
+<!-- TODO add unsubscribe link -->

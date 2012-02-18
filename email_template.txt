@@ -1,0 +1,12 @@
+Hey {{ user1.name }},
+We've found a match for you through PeaceConnector ({{ base_url }})!
+
+What you have in common:
+{% for i in in_common %}
+* {{ i }}
+{% endfor %}
+
+Your match is {{ user2.name }} from {{ user2.country }}.
+Visit their facebook profile at {{ user2.profile_url }}.
+
+<!-- TODO add unsubscribe link -->
