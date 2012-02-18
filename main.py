@@ -3,15 +3,9 @@
 FACEBOOK_APP_ID = "105470519580554"
 FACEBOOK_APP_SECRET = "d23ef0731fa99355d36a29994a84d170"
 
-import base64
 import cgi
-import Cookie
-import email.utils
-import hashlib
-import hmac
 import logging
 import os.path
-import time
 import urllib
 import re
 import datetime
@@ -21,7 +15,6 @@ from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import util
 from google.appengine.ext.webapp import template
-
 
 class User(db.Model):
     fb_id = db.StringProperty(required=True)
@@ -41,12 +34,10 @@ class BaseHandler(webapp.RequestHandler):
     @property
     def current_user(self):
         """Returns the logged in Facebook user, or None if unconnected."""
-        if not hasattr(self, "_current_user"):
-            self._current_user = None
-            user_id = parse_cookie(self.request.cookies.get("fb_user"))
-            if user_id:
-                self._current_user = User.get_by_key_name(user_id)
-        return self._current_user
+        if self.request.get("user"):
+            return User.get(self.request.get("user"))
+        
+        return None
 
 
 class HomeHandler(BaseHandler):
@@ -66,21 +57,26 @@ class LoginHandler(BaseHandler):
                     redirect_uri=self.request.path_url,
                     scope="user_about_me,user_birthday,user_education_history,"
                           "user_likes,user_location,user_work_history,email")
+
         if self.request.get("code"):
             args["client_secret"] = FACEBOOK_APP_SECRET
             args["code"] = self.request.get("code")
+
+            logging.info("Facebook login phase 2")
+            
             response = cgi.parse_qs(urllib.urlopen(
                 "https://graph.facebook.com/oauth/access_token?" +
                 urllib.urlencode(args)).read())
             access_token = response["access_token"][-1]
 
+            logging.info("Loading basic info")
             profile = json.load(urllib.urlopen(
                 "https://graph.facebook.com/me?" +
                 urllib.urlencode(dict(access_token=access_token))))
             
-            birthday = datetime.date(profile["birthday"])
-            logging.error("birthday: %s", birthday)
+            birthday = datetime.datetime.strptime(profile["birthday"], "%m/%d/%Y").date()
             
+            logging.info("Loading country")
             country_raw = urllib.urlopen(
                 "https://api.facebook.com/method/fql.query?" +
                 urllib.urlencode(dict(query="SELECT current_location.country FROM user WHERE uid=" + profile["id"],
@@ -109,6 +105,7 @@ class LoginHandler(BaseHandler):
             
             likes_ids = [like["id"] for like in all_likes]
             
+            logging.info("Saving user to DB")
             user = User(key_name=str(profile["id"]), fb_id=str(profile["id"]),
                         name=profile["name"], access_token=access_token,
                         profile_url=profile["link"], email=profile["email"], 
@@ -119,73 +116,20 @@ class LoginHandler(BaseHandler):
             
             user.put()
             
-            set_cookie(self.response, "fb_user", str(profile["id"]),
-                       expires=time.time() + 30 * 86400)
-            
             # TODO: start searching for matches in DB, in another thread...
             
-            self.redirect("/")
+            logging.info("Redirectring back to home")
+            self.redirect("/?user=%s" % user.key())
         else:
+            logging.info("Redirecting to facebook login")
             self.redirect(
                 "https://graph.facebook.com/oauth/authorize?" +
                 urllib.urlencode(args))
-
-
-class LogoutHandler(BaseHandler):
-    def get(self):
-        set_cookie(self.response, "fb_user", "", expires=time.time() - 86400)
-        self.redirect("/")
-
-
-def set_cookie(response, name, value, domain=None, path="/", expires=None):
-    """Generates and signs a cookie for the give name/value"""
-    timestamp = str(int(time.time()))
-    value = base64.b64encode(value)
-    signature = cookie_signature(value, timestamp)
-    cookie = Cookie.BaseCookie()
-    cookie[name] = "|".join([value, timestamp, signature])
-    cookie[name]["path"] = path
-    if domain: cookie[name]["domain"] = domain
-    if expires:
-        cookie[name]["expires"] = email.utils.formatdate(
-            expires, localtime=False, usegmt=True)
-    response.headers._headers.append(("Set-Cookie", cookie.output()[12:]))
-
-
-def parse_cookie(value):
-    """Parses and verifies a cookie value from set_cookie"""
-    if not value: return None
-    parts = value.split("|")
-    if len(parts) != 3: return None
-    if cookie_signature(parts[0], parts[1]) != parts[2]:
-        logging.warning("Invalid cookie signature %r", value)
-        return None
-    timestamp = int(parts[1])
-    if timestamp < time.time() - 30 * 86400:
-        logging.warning("Expired cookie %r", value)
-        return None
-    try:
-        return base64.b64decode(parts[0]).strip()
-    except:
-        return None
-
-
-def cookie_signature(*parts):
-    """Generates a cookie signature.
-
-    We use the Facebook app secret since it is different for every app (so
-    people using this example don't accidentally all use the same secret).
-    """
-    cookie_hash = hmac.new(FACEBOOK_APP_SECRET, digestmod=hashlib.sha1)
-    for part in parts: cookie_hash.update(part)
-    return cookie_hash.hexdigest()
-
 
 def main():
     util.run_wsgi_app(webapp.WSGIApplication([
         (r"/", HomeHandler),
         (r"/auth/login", LoginHandler),
-        (r"/auth/logout", LogoutHandler),
     ], debug=True))
 
 
