@@ -9,7 +9,7 @@
       <p>We connect people in countries of conflict simply based on shared hobbies</p>
     {% if current_user %}
       <p>Thank you {{ current_user.name|escape }}!</p>
-      <p><img src="http://graph.facebook.com/{{ current_user.id }}/picture"/></p>
+      <p><img src="http://graph.facebook.com/{{ current_user.fb_id }}/picture"/></p>
       <p>We'll match you with someone in a country of<br/>
          conflict via email as soon as possible</p>
     {% else %}
