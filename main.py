@@ -210,6 +210,8 @@ class MatchHandler(BaseHandler):
         for user in users_from_opposite_countries:
             in_common = self._find_common_grounds(user_to_match, user)
             if (len(in_common) > 0):
+                # TODO - check that we didn't already match between these 2 users
+                
                 logging.info("Found a match between '%s' and '%s'", user_to_match.name, user.name)
                 self._send_email(user_to_match, user, in_common)
                 self._send_email(user, user_to_match, in_common)
