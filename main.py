@@ -15,7 +15,6 @@ import random
 from django.utils import simplejson as json
 from google.appengine.ext import db
 from google.appengine.ext import webapp
-from google.appengine.ext.db import stats
 from google.appengine.ext.webapp import util
 from google.appengine.ext.webapp import template
 from google.appengine.api import taskqueue
@@ -23,6 +22,7 @@ from google.appengine.api import mail
 
 
 from conflicts_dict import CONFLICTS_DICT
+from matches_counter import get_matches_count, increment_matches_count
 
 class User(db.Model):
     fb_id = db.StringProperty(required=True)
@@ -65,11 +65,7 @@ class BaseHandler(webapp.RequestHandler):
     
     @property
     def match_count(self):
-        matches_stats = stats.KindStat.all().filter("kind_name = ", Match.__name__).get()
-        if matches_stats is not None:            
-            return matches_stats.count
-        else:
-            return 0
+        return get_matches_count()
 
 class HomeHandler(BaseHandler):
     def get(self):
@@ -222,6 +218,7 @@ class MatchHandler(BaseHandler):
                 match_obj = Match(first_fb_id=user_to_match.fb_id, 
                                   second_fb_id=user.fb_id)
                 match_obj.put()
+                increment_matches_count()
                 
                 logging.info("Deleting matched users")
                 db.delete(user_to_match)
