@@ -15,6 +15,7 @@ import random
 from django.utils import simplejson as json
 from google.appengine.ext import db
 from google.appengine.ext import webapp
+from google.appengine.ext.db import stats
 from google.appengine.ext.webapp import util
 from google.appengine.ext.webapp import template
 from google.appengine.api import taskqueue
@@ -36,7 +37,11 @@ class User(db.Model):
     work_position_ids = db.StringListProperty(required=True)
     education_concentrations_ids = db.StringListProperty(required=True)
     likes_ids = db.StringListProperty(required=True)
-    
+
+class Match(db.Model):
+    first_fb_id = db.StringProperty(required=True)
+    second_fb_id = db.StringProperty(required=True)
+        
 class BaseHandler(webapp.RequestHandler):
     @property
     def current_user(self):
@@ -53,107 +58,125 @@ class BaseHandler(webapp.RequestHandler):
     @property
     def code(self):
         return self.request.get("code")
+    
+    @property
+    def error(self):
+        return self.request.get("error")
+    
+    @property
+    def match_count(self):
+        matches_stats = stats.KindStat.all().filter("kind_name = ", Match.__name__).get()
+        if matches_stats is not None:            
+            return matches_stats.count
+        else:
+            return 0
 
 class HomeHandler(BaseHandler):
     def get(self):
         path = os.path.join(os.path.dirname(__file__), "template.html")
         args = dict(current_user=self.current_user, 
                     ask_for_country=self.ask_for_country,
-                    code=self.code)
+                    code=self.code,
+                    error=self.error,
+                    match_count=self.match_count)
         self.response.out.write(template.render(path, args))
 
 
 class LoginHandler(BaseHandler):
     def get(self):
-        if self.request.get("error"):
-            self.response.out.write(self.request.get("error_description"))
-            return
+        try:            
+            if self.request.get("error"):
+                # TODO: define special exception class for this
+                raise Exception(self.request.get("error"))
         
-        args = dict(client_id=FACEBOOK_APP_ID, 
-                    redirect_uri=self.request.path_url,
-                    scope="user_about_me,user_birthday,user_education_history,"
-                          "user_likes,user_location,user_work_history,email")
+            args = dict(client_id=FACEBOOK_APP_ID, 
+                        redirect_uri=self.request.path_url,
+                        scope="user_about_me,user_birthday,user_education_history,"
+                              "user_likes,user_location,user_work_history,email")
 
-        if self.code:
-            args["client_secret"] = FACEBOOK_APP_SECRET
-            args["code"] = self.code
+            if self.code:
+                args["client_secret"] = FACEBOOK_APP_SECRET
+                args["code"] = self.code
 
-            logging.info("Facebook login phase 2")
-            
-            response = cgi.parse_qs(urllib.urlopen(
-                "https://graph.facebook.com/oauth/access_token?" +
-                urllib.urlencode(args)).read())
-            
-            logging.info("Phase 2 response: %s", response)
-            access_token = response["access_token"][-1]
-
-            logging.info("Loading basic info")
-            profile = json.load(urllib.urlopen(
-                "https://graph.facebook.com/me?" +
-                urllib.urlencode(dict(access_token=access_token))))
-            
-            birthday = datetime.datetime.strptime(profile["birthday"], "%m/%d/%Y").date()
-            
-            logging.info("Loading country")
-            country = self.request.get("country")
-            
-            if not country:
-                try:
-                    country_raw = urllib.urlopen(
-                        "https://api.facebook.com/method/fql.query?" +
-                        urllib.urlencode(dict(query="SELECT current_location.country FROM user WHERE uid=" + profile["id"],
-                                              access_token=access_token)))
-                    country_match = re.match(".*<country>(.*)</country>.*", 
-                                             country_raw.read(), 
-                                             re.MULTILINE | re.DOTALL)
-                    if country_match:
-                        country = country_match.groups()[0].strip()
-        
-                except Exception:
-                    # country will be none and we'll ask for country from user
-                    logging.exception("Exception while trying to fetch country (will ask from user)")
-                    pass
-
-            if not country:                    
-                logging.warn("Couldn't get country from facebook, asking directly instead")
-                self.redirect("/?" + urllib.urlencode(dict(code=self.code, ask_for_country=True)))
-                return
+                logging.info("Facebook login phase 2")
                 
-            work_position_ids = set()
-            if "work" in profile:
-                for workplace in profile["work"]:
-                    if "position" in workplace:
-                        work_position_ids.add(workplace["position"]["id"])
-            
-            education_concentrations_ids = set()
-            if "education" in profile:
-                for education_item in profile["education"]:
-                    if "concentration" in education_item:
-                        for concentration in education_item["concentration"]:
-                            education_concentrations_ids.add(concentration["id"])
+                response = cgi.parse_qs(urllib.urlopen(
+                        "https://graph.facebook.com/oauth/access_token?" +
+                        urllib.urlencode(args)).read())
                 
-            logging.info("Saving user to DB")
-            user = User(key_name=str(profile["id"]), fb_id=str(profile["id"]),
-                        name=profile["name"], access_token=access_token,
-                        profile_url=profile["link"], email=profile["email"], 
-                        birthday=birthday, country=country,
-                        work_position_ids=list(work_position_ids), 
-                        education_concentrations_ids=list(education_concentrations_ids),
-                        # likes will be added separately
-                        likes_ids=[])
+                logging.info("Phase 2 response: %s", response)
+                access_token = response["access_token"][-1]
+    
+                logging.info("Loading basic info")
+                profile = json.load(urllib.urlopen(
+                    "https://graph.facebook.com/me?" +
+                    urllib.urlencode(dict(access_token=access_token))))
+                
+                birthday = datetime.datetime.strptime(profile["birthday"], "%m/%d/%Y").date()
+                
+                logging.info("Loading country")
+                country = self.request.get("country")
+                
+                if not country:
+                    try:
+                        country_raw = urllib.urlopen(
+                            "https://api.facebook.com/method/fql.query?" +
+                            urllib.urlencode(dict(query="SELECT current_location.country FROM user WHERE uid=" + profile["id"],
+                                                  access_token=access_token)))
+                        country_match = re.match(".*<country>(.*)</country>.*", 
+                                                 country_raw.read(), 
+                                                 re.MULTILINE | re.DOTALL)
+                        if country_match:
+                            country = country_match.groups()[0].strip()
             
-            user.put()
+                    except Exception:
+                        # country will be none and we'll ask for country from user
+                        logging.exception("Exception while trying to fetch country (will ask from user)")
+                        pass
+    
+                if not country:                    
+                    logging.warn("Couldn't get country from facebook, asking directly instead")
+                    self.redirect("/?" + urllib.urlencode(dict(code=self.code, ask_for_country=True)))
+                    return
+                    
+                work_position_ids = set()
+                if "work" in profile:
+                    for workplace in profile["work"]:
+                        if "position" in workplace:
+                            work_position_ids.add(workplace["position"]["id"])
+                
+                education_concentrations_ids = set()
+                if "education" in profile:
+                    for education_item in profile["education"]:
+                        if "concentration" in education_item:
+                            for concentration in education_item["concentration"]:
+                                education_concentrations_ids.add(concentration["id"])
+                    
+                logging.info("Saving user to DB")
+                user = User(key_name=str(profile["id"]), fb_id=str(profile["id"]),
+                            name=profile["name"], access_token=access_token,
+                            profile_url=profile["link"], email=profile["email"], 
+                            birthday=birthday, country=country,
+                            work_position_ids=list(work_position_ids), 
+                            education_concentrations_ids=list(education_concentrations_ids),
+                            # likes will be added separately
+                            likes_ids=[])
+                
+                user.put()
+                
+                logging.info("Queuing fetch likes task")
+                taskqueue.add(url="/fetch_likes", params={ "user" : user.key() })                        
+                
+                logging.info("Redirecting back to home")
+                self.redirect("/?user=%s" % user.key())                
+            else:
+                logging.info("Redirecting to facebook login")
+                self.redirect(
+                    "https://graph.facebook.com/oauth/authorize?" +
+                    urllib.urlencode(args))
             
-            logging.info("Queuing fetch likes task")
-            taskqueue.add(url="/fetch_likes", params={ "user" : user.key() })                        
-            
-            logging.info("Redirecting back to home")
-            self.redirect("/?user=%s" % user.key())
-        else:
-            logging.info("Redirecting to facebook login")
-            self.redirect(
-                "https://graph.facebook.com/oauth/authorize?" +
-                urllib.urlencode(args))
+        except Exception, ex:
+            self.redirect("/?" + urllib.urlencode(dict(error=ex)))
 
 class FetchLikesHandler(BaseHandler):
     def post(self):
@@ -194,6 +217,11 @@ class MatchHandler(BaseHandler):
                 logging.info("Found a match between '%s' and '%s'", user_to_match.name, user.name)
                 self._send_email(user_to_match, user, in_common)
                 self._send_email(user, user_to_match, in_common)
+                
+                logging.info("Saving match in DB")
+                match_obj = Match(first_fb_id=user_to_match.fb_id, 
+                                  second_fb_id=user.fb_id)
+                match_obj.put()
                 
                 logging.info("Deleting matched users")
                 db.delete(user_to_match)

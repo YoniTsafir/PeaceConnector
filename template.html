@@ -7,6 +7,16 @@
   <body>
       <h1>Peace Connector</h1>
       <p>We connect people in countries of conflict simply based on shared hobbies</p>
+      <p>So far, {{ match_count }} matches were made.</p> <!-- TODO: pretty counter -->
+    {% if error %}
+      <p>
+        <span style="color=red">
+            Oops... We're terribly sorry, the last operation resulted in an error, 
+            please try again in a few minutes.
+        </span>
+      </p>
+    {% endif %}
+    
     {% if current_user %}
       <p>Thank you {{ current_user.name|escape }}!</p>
       <p><img src="http://graph.facebook.com/{{ current_user.fb_id }}/picture"/></p>
