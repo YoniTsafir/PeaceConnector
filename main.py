@@ -54,17 +54,12 @@ class BaseHandler(webapp.RequestHandler):
     def code(self):
         return self.request.get("code")
 
-    @property
-    def unsubscribe(self):
-        return self.request.get("unsubscribe")
-
 class HomeHandler(BaseHandler):
     def get(self):
         path = os.path.join(os.path.dirname(__file__), "template.html")
         args = dict(current_user=self.current_user, 
                     ask_for_country=self.ask_for_country,
-                    code=self.code,
-                    unsubscribe=self.unsubscribe)
+                    code=self.code)
         self.response.out.write(template.render(path, args))
 
 
@@ -149,10 +144,10 @@ class LoginHandler(BaseHandler):
             
             user.put()
             
-            logging.info("Queueing fetch likes task")
+            logging.info("Queuing fetch likes task")
             taskqueue.add(url="/fetch_likes", params={ "user" : user.key() })                        
             
-            logging.info("Redirectring back to home")
+            logging.info("Redirecting back to home")
             self.redirect("/?user=%s" % user.key())
         else:
             logging.info("Redirecting to facebook login")
@@ -175,7 +170,7 @@ class FetchLikesHandler(BaseHandler):
         
         user.put()
         
-        logging.info("Queueing match task")
+        logging.info("Queuing match task")
         taskqueue.add(url="/match", params={ "user" : user.key() })
 
 class MatchHandler(BaseHandler):
@@ -199,6 +194,10 @@ class MatchHandler(BaseHandler):
                 logging.info("Found a match between '%s' and '%s'", user_to_match.name, user.name)
                 self._send_email(user_to_match, user, in_common)
                 self._send_email(user, user_to_match, in_common)
+                
+                logging.info("Deleting matched users")
+                db.delete(user_to_match)
+                db.delete(user)
                 return
             
         logging.info("Couldn't find a match for '%s'", user_to_match.name)
@@ -238,24 +237,17 @@ class MatchHandler(BaseHandler):
         args = dict(user1=user1, 
                     user2=user2,
                     in_common=in_common,
-                    base_url=base_url,
-                    unsubscribe_link="%sunsubscribe?user=%s" % (base_url, user1.key()))
+                    base_url=base_url)
 
         email_body = template.render(email_body_path, args)
         email_html = template.render(email_html_path, args)
         
         message = mail.EmailMessage(sender="Peace Connector <%s>" % (PEACE_CONNECTOR_EMAIL,),
                                     to="%s <%s>" % (user1.name, user1.email),
-                                    subject="We have found a new match for you at Peace Connector",
+                                    subject="We have found a match for you at Peace Connector",
                                     body=email_body,
                                     html=email_html)
         message.send()
-
-class UnsubscribeHandler(BaseHandler):
-    def get(self):
-        logging.info("Deleting %s from DB (unsubsciption)" % (self.current_user.name))
-        db.delete(self.current_user)
-        self.redirect("/?unsubscribe=True")
         
     
 def main():
@@ -264,7 +256,6 @@ def main():
         (r"/auth/login", LoginHandler),
         (r"/match", MatchHandler),
         (r"/fetch_likes", FetchLikesHandler),
-        (r"/unsubscribe", UnsubscribeHandler),
     ], debug=True))
 
 
