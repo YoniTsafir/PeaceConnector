@@ -9,4 +9,4 @@ What you have in common:
 Your match is {{ user2.name }} from {{ user2.country }}.
 Visit their facebook profile at {{ user2.profile_url }}.
 
-<!-- TODO add unsubscribe link -->
+If you wish to unsubscribe from PeaceConnector and stop receiving possible matches, go to {{ unsubscribe_link }}

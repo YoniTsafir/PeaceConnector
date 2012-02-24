@@ -7,7 +7,9 @@
   <body>
       <h1>Peace Connector</h1>
       <p>We connect people in countries of conflict simply based on shared hobbies</p>
-    {% if current_user %}
+    {% if unsubscribe %}
+      <p>Successfully Unsubscribed</p>
+    {% else %} {% if current_user %}
       <p>Thank you {{ current_user.name|escape }}!</p>
       <p><img src="http://graph.facebook.com/{{ current_user.fb_id }}/picture"/></p>
       <p>We'll match you with someone in a country of<br/>
@@ -264,7 +266,7 @@
       </form>
     {% else %}
       <p><a href="/auth/login">Log in with Facebook to start the adventure!</a></p>
-    {% endif %} {% endif %}
+    {% endif %} {% endif %} {% endif %}
       <!-- TODO: add tweet/share on facebook -->
       <p>Created at the Innovation Israel Hackathon</p>
   </body>

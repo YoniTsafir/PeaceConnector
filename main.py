@@ -54,12 +54,17 @@ class BaseHandler(webapp.RequestHandler):
     def code(self):
         return self.request.get("code")
 
+    @property
+    def unsubscribe(self):
+        return self.request.get("unsubscribe")
+
 class HomeHandler(BaseHandler):
     def get(self):
         path = os.path.join(os.path.dirname(__file__), "template.html")
         args = dict(current_user=self.current_user, 
                     ask_for_country=self.ask_for_country,
-                    code=self.code)
+                    code=self.code,
+                    unsubscribe=self.unsubscribe)
         self.response.out.write(template.render(path, args))
 
 
@@ -155,10 +160,9 @@ class LoginHandler(BaseHandler):
                 "https://graph.facebook.com/oauth/authorize?" +
                 urllib.urlencode(args))
 
-class FetchLikesHandler(webapp.RequestHandler):
+class FetchLikesHandler(BaseHandler):
     def post(self):
-        user_key = self.request.get("user")
-        user = User.get(user_key)
+        user = self.current_user
 
         logging.info("Fetching user's likes")
         all_likes = json.load(urllib.urlopen(
@@ -174,12 +178,11 @@ class FetchLikesHandler(webapp.RequestHandler):
         logging.info("Queueing match task")
         taskqueue.add(url="/match", params={ "user" : user.key() })
 
-class MatchHandler(webapp.RequestHandler):
+class MatchHandler(BaseHandler):
     def post(self):
-        user_key = self.request.get("user")
-        user_to_match = User.get(user_key)
+        user_to_match = self.current_user
         if not user_to_match:
-            logging.warn("Got match request for non existing user key (%s)" % (user_key,))
+            logging.warn("Got match request for non existing user key (%s)" % (self.request.get("user"),))
             return
         
         if not user_to_match.country in CONFLICTS_DICT:
@@ -230,17 +233,30 @@ class MatchHandler(webapp.RequestHandler):
 
         email_body_path = os.path.join(os.path.dirname(__file__), "email_template.txt")
         email_html_path = os.path.join(os.path.dirname(__file__), "email_template.html")
+        base_url = 'http://' + os.environ['HTTP_HOST'] + '/'
+        
         args = dict(user1=user1, 
                     user2=user2,
                     in_common=in_common,
-                    base_url='http://'+os.environ['HTTP_HOST']+'/')
+                    base_url=base_url,
+                    unsubscribe_link="%sunsubscribe?user=%s" % (base_url, user1.key()))
 
+        email_body = template.render(email_body_path, args)
+        email_html = template.render(email_html_path, args)
+        
         message = mail.EmailMessage(sender="Peace Connector <%s>" % (PEACE_CONNECTOR_EMAIL,),
                                     to="%s <%s>" % (user1.name, user1.email),
                                     subject="We have found a new match for you at Peace Connector",
-                                    body=template.render(email_body_path, args),
-                                    html=template.render(email_html_path, args))
+                                    body=email_body,
+                                    html=email_html)
         message.send()
+
+class UnsubscribeHandler(BaseHandler):
+    def get(self):
+        logging.info("Deleting %s from DB (unsubsciption)" % (self.current_user.name))
+        db.delete(self.current_user)
+        self.redirect("/?unsubscribe=True")
+        
     
 def main():
     util.run_wsgi_app(webapp.WSGIApplication([
@@ -248,6 +264,7 @@ def main():
         (r"/auth/login", LoginHandler),
         (r"/match", MatchHandler),
         (r"/fetch_likes", FetchLikesHandler),
+        (r"/unsubscribe", UnsubscribeHandler),
     ], debug=True))
 
 
