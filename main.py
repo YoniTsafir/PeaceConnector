@@ -131,14 +131,7 @@ class LoginHandler(BaseHandler):
                     if "concentration" in education_item:
                         for concentration in education_item["concentration"]:
                             education_concentrations_ids.append(concentration["id"])
-
-            logging.info("Fetching user's likes")
-            all_likes = json.load(urllib.urlopen(
-                "https://graph.facebook.com/me/likes?" +
-                urllib.urlencode(dict(access_token=access_token))))["data"]
-            
-            likes_ids = [like["id"] for like in all_likes]
-            
+                
             logging.info("Saving user to DB")
             user = User(key_name=str(profile["id"]), fb_id=str(profile["id"]),
                         name=profile["name"], access_token=access_token,
@@ -146,12 +139,13 @@ class LoginHandler(BaseHandler):
                         birthday=birthday, country=country,
                         work_position_ids=work_position_ids, 
                         education_concentrations_ids=education_concentrations_ids,
-                        likes_ids=likes_ids)
+                        # likes will be added separately
+                        likes_ids=[])
             
             user.put()
             
-            logging.info("Queueing match task")
-            taskqueue.add(url="/match", params={ "user" : user.key() })
+            logging.info("Queueing fetch likes task")
+            taskqueue.add(url="/fetch_likes", params={ "user" : user.key() })                        
             
             logging.info("Redirectring back to home")
             self.redirect("/?user=%s" % user.key())
@@ -160,6 +154,25 @@ class LoginHandler(BaseHandler):
             self.redirect(
                 "https://graph.facebook.com/oauth/authorize?" +
                 urllib.urlencode(args))
+
+class FetchLikesHandler(webapp.RequestHandler):
+    def post(self):
+        user_key = self.request.get("user")
+        user = User.get(user_key)
+
+        logging.info("Fetching user's likes")
+        all_likes = json.load(urllib.urlopen(
+            "https://graph.facebook.com/me/likes?" +
+            urllib.urlencode(dict(access_token=user.access_token))))["data"]
+        
+        likes_ids = [like["id"] for like in all_likes]
+        
+        user.likes_ids = likes_ids
+        
+        user.put()
+        
+        logging.info("Queueing match task")
+        taskqueue.add(url="/match", params={ "user" : user.key() })
 
 class MatchHandler(webapp.RequestHandler):
     def post(self):
@@ -226,6 +239,7 @@ def main():
         (r"/", HomeHandler),
         (r"/auth/login", LoginHandler),
         (r"/match", MatchHandler),
+        (r"/fetch_likes", FetchLikesHandler),
     ], debug=True))
 
 
