@@ -95,23 +95,30 @@ class LoginHandler(BaseHandler):
             birthday = datetime.datetime.strptime(profile["birthday"], "%m/%d/%Y").date()
             
             logging.info("Loading country")
-            country_raw = urllib.urlopen(
-                "https://api.facebook.com/method/fql.query?" +
-                urllib.urlencode(dict(query="SELECT current_location.country FROM user WHERE uid=" + profile["id"],
-                                      access_token=access_token)))
-
             country = self.request.get("country")
-            if not country:
-                country_match = re.match(".*<country>(.*)</country>.*", 
-                                         country_raw.read(), 
-                                         re.MULTILINE | re.DOTALL)
-                if country_match:
-                    country = country_match.groups()[0].strip()
-                else:
-                    logging.warn("Couldn't get country from facebook, asking directly instead")
-                    self.redirect("/?" + urllib.urlencode(dict(code=self.code, ask_for_country=True)))
-                    return
             
+            if not country:
+                try:
+                    country_raw = urllib.urlopen(
+                        "https://api.facebook.com/method/fql.query?" +
+                        urllib.urlencode(dict(query="SELECT current_location.country FROM user WHERE uid=" + profile["id"],
+                                              access_token=access_token)))
+                    country_match = re.match(".*<country>(.*)</country>.*", 
+                                             country_raw.read(), 
+                                             re.MULTILINE | re.DOTALL)
+                    if country_match:
+                        country = country_match.groups()[0].strip()
+        
+                except Exception:
+                    # country will be none and we'll ask for country from user
+                    logging.exception("Exception while trying to fetch country (will ask from user)")
+                    pass
+
+            if not country:                    
+                logging.warn("Couldn't get country from facebook, asking directly instead")
+                self.redirect("/?" + urllib.urlencode(dict(code=self.code, ask_for_country=True)))
+                return
+                
             work_position_ids = []
             if "work" in profile:
                 for workplace in profile["work"]:
