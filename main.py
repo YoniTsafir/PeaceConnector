@@ -119,26 +119,26 @@ class LoginHandler(BaseHandler):
                 self.redirect("/?" + urllib.urlencode(dict(code=self.code, ask_for_country=True)))
                 return
                 
-            work_position_ids = []
+            work_position_ids = set()
             if "work" in profile:
                 for workplace in profile["work"]:
                     if "position" in workplace:
-                        work_position_ids.append(workplace["position"]["id"])
+                        work_position_ids.add(workplace["position"]["id"])
             
-            education_concentrations_ids = []
+            education_concentrations_ids = set()
             if "education" in profile:
                 for education_item in profile["education"]:
                     if "concentration" in education_item:
                         for concentration in education_item["concentration"]:
-                            education_concentrations_ids.append(concentration["id"])
+                            education_concentrations_ids.add(concentration["id"])
                 
             logging.info("Saving user to DB")
             user = User(key_name=str(profile["id"]), fb_id=str(profile["id"]),
                         name=profile["name"], access_token=access_token,
                         profile_url=profile["link"], email=profile["email"], 
                         birthday=birthday, country=country,
-                        work_position_ids=work_position_ids, 
-                        education_concentrations_ids=education_concentrations_ids,
+                        work_position_ids=list(work_position_ids), 
+                        education_concentrations_ids=list(education_concentrations_ids),
                         # likes will be added separately
                         likes_ids=[])
             
