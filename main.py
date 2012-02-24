@@ -178,17 +178,25 @@ class MatchHandler(webapp.RequestHandler):
     def post(self):
         user_key = self.request.get("user")
         user_to_match = User.get(user_key)
-        if user_to_match and user_to_match.country in CONFLICTS_DICT:
-            conflicting_countries = CONFLICTS_DICT[user_to_match.country]
-            users_from_opposite_countries = User.all().filter("country IN ", conflicting_countries)
-            random.shuffle(list(users_from_opposite_countries))
-            for user in users_from_opposite_countries:
-                in_common = self._find_common_grounds(user_to_match, user)
-                if (len(in_common) > 0):
-                    logging.info("Found a match between '%s' and '%s'", user_to_match.name, user.name)
-                    self._send_email(user_to_match, user, in_common)
-                    self._send_email(user, user_to_match, in_common)
-                    return
+        if not user_to_match:
+            logging.warn("Got match request for non existing user key (%s)" % (user_key,))
+            return
+        
+        if not user_to_match.country in CONFLICTS_DICT:
+            logging.warn("Got match request for a user from a country not in our conflicts dict (%s)" % 
+                         (user_to_match.country,))
+            return
+        
+        conflicting_countries = CONFLICTS_DICT[user_to_match.country]
+        users_from_opposite_countries = User.all().filter("country IN ", conflicting_countries)
+        random.shuffle(list(users_from_opposite_countries))
+        for user in users_from_opposite_countries:
+            in_common = self._find_common_grounds(user_to_match, user)
+            if (len(in_common) > 0):
+                logging.info("Found a match between '%s' and '%s'", user_to_match.name, user.name)
+                self._send_email(user_to_match, user, in_common)
+                self._send_email(user, user_to_match, in_common)
+                return
             
         logging.info("Couldn't find a match for '%s'", user_to_match.name)
         
