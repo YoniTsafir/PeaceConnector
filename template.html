@@ -13,7 +13,7 @@
 	<script type="text/javascript">
 		$(document).ready(function(){
 			$('#fblogin').click(function(){
-				$('#fblogin, #start-adventure').fadeOut();
+				$(this).parent('form').fadeOut();
 				$('#loader, #loaderText').fadeIn();
 			});
 			
