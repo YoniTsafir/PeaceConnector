@@ -159,6 +159,18 @@ width: 960px;
 position: relative;
 padding: 60px 0;
 text-shadow: 1px 1px 0 #196bb7;
+overflow: hidden;
+}
+
+#wrapper > section > div {
+width: 1960px;
+position: relative;	
+}
+
+#wrapper > section > div > div {
+width: 960px;
+margin-right: 20px;
+float: left;	
 }
 
 #whatwedo {
@@ -299,6 +311,30 @@ bottom: 25px;
 font-size: 16px;
 color: #868686;
 display: none;
+}
+
+.sceneButton {
+font-size: 36px;
+background: rgba(0,0,0,0.2);
+border-radius: 75px;
+padding: 10px 12px;
+display: block;
+width: 20px;	
+position: absolute;
+top: 50%;
+left: auto;
+right: 10px;
+color: #fff;
+z-index: 999;
+margin-top: -26px;
+}
+
+.sceneButton:hover {
+background: rgba(0,0,0,0.4);	
+}
+
+.sceneButton.prev {
+left: 10px;	
 }
 
 /* Footer */
