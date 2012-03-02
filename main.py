@@ -138,7 +138,7 @@ class LoginHandler(BaseHandler):
             
                     except Exception, ex:
                         # country will be none and we'll ask for country from user
-                        logging.error("Exception while trying to fetch country (will ask from user):" + str(ex))
+                        logging.error("Exception while trying to fetch country (will ask from user):%s", (ex,))
                         pass
     
                 if not country:                    
@@ -162,7 +162,7 @@ class LoginHandler(BaseHandler):
                                 education_concentrations_ids.add(concentration["id"])
                     
                 logging.info("Saving user to DB")
-                user = User(key_name=str(profile["id"]), fb_id=str(profile["id"]),
+                user = User(key_name="%s" % (profile["id"]), fb_id="%s" % (profile["id"]),
                             name=profile["name"], access_token=access_token,
                             profile_url=profile["link"], email=profile["email"], 
                             birthday=birthday, country=country,
@@ -314,6 +314,7 @@ class MatchHandler(BaseHandler):
                                       (user2.country,))
         
     def _post_to_both_feeds(self, user1, user2):
+        logging.info("Posting to %s's feed" % (user1.name,))
         self._post_match_to_user_feed(user1, "I was just matched with %s from %s by PeaceConnector!" % 
                                       (user2.name, user2.country))
     
@@ -331,9 +332,9 @@ class MatchHandler(BaseHandler):
             response = urllib.urlopen("https://graph.facebook.com/" + user.fb_id +"/feed?" +
                                       urllib.urlencode(args), urllib.urlencode(post_args))
             parsed_response = json.load(response)
-            logging.info("response for post to feed:" + str(parsed_response))
+            logging.info("response for post to feed:%s" % (parsed_response))
         except Exception, ex:
-            logging.error("Exception while trying to post to feed... Will skip..." + str(ex))
+            logging.error("Exception while trying to post to feed... Will skip... %s" % (ex))
     
 def main():
     util.run_wsgi_app(webapp.WSGIApplication([
