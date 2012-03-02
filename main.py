@@ -37,6 +37,7 @@ class User(db.Model):
     work_position_ids = db.StringListProperty(required=True)
     education_concentrations_ids = db.StringListProperty(required=True)
     likes_ids = db.StringListProperty(required=True)
+    post_to_feed = db.BooleanProperty(required=True)
 
 class Match(db.Model):
     first_fb_id = db.StringProperty(required=True)
@@ -66,6 +67,10 @@ class BaseHandler(webapp.RequestHandler):
     @property
     def match_count(self):
         return get_matches_count()
+    
+    @property
+    def post_to_feed(self):
+        return self.request.get("post_to_feed") == "True" or self.request.get("post_to_feed") == "on"
 
 class HomeHandler(BaseHandler):
     def get(self):
@@ -74,7 +79,8 @@ class HomeHandler(BaseHandler):
                     ask_for_country=self.ask_for_country,
                     code=self.code,
                     error=self.error,
-                    match_count=self.match_count)
+                    match_count=self.match_count,
+                    post_to_feed=str(self.post_to_feed))
         self.response.out.write(template.render(path, args))
 
 
@@ -84,11 +90,16 @@ class LoginHandler(BaseHandler):
             if self.request.get("error"):
                 # TODO: define special exception class for this
                 raise Exception(self.request.get("error"))
-        
+            
+            logging.info("Value for post_to_feed:%s" % (self.request.get("post_to_feed"),))
             args = dict(client_id=FACEBOOK_APP_ID, 
-                        redirect_uri=self.request.path_url,
+                        redirect_uri=self.request.path_url +"?post_to_feed=" + str(self.post_to_feed),
+                        post_to_feed=self.post_to_feed,
                         scope="user_about_me,user_birthday,user_education_history,"
                               "user_likes,user_location,user_work_history,email")
+
+            if self.post_to_feed:
+                args["scope"] += ",publish_stream,offline_access"
 
             if self.code:
                 args["client_secret"] = FACEBOOK_APP_SECRET
@@ -125,14 +136,16 @@ class LoginHandler(BaseHandler):
                         if country_match:
                             country = country_match.groups()[0].strip()
             
-                    except Exception:
+                    except Exception, ex:
                         # country will be none and we'll ask for country from user
-                        logging.exception("Exception while trying to fetch country (will ask from user)")
+                        logging.error("Exception while trying to fetch country (will ask from user):" + str(ex))
                         pass
     
                 if not country:                    
                     logging.warn("Couldn't get country from facebook, asking directly instead")
-                    self.redirect("/?" + urllib.urlencode(dict(code=self.code, ask_for_country=True)))
+                    self.redirect("/?" + urllib.urlencode(dict(code=self.code, 
+                                                               post_to_feed=self.post_to_feed, 
+                                                               ask_for_country=True)))
                     return
                     
                 work_position_ids = set()
@@ -156,7 +169,8 @@ class LoginHandler(BaseHandler):
                             work_position_ids=list(work_position_ids), 
                             education_concentrations_ids=list(education_concentrations_ids),
                             # likes will be added separately
-                            likes_ids=[])
+                            likes_ids=[],
+                            post_to_feed=args["post_to_feed"])
                 
                 user.put()
                 
@@ -193,6 +207,7 @@ class FetchLikesHandler(BaseHandler):
         taskqueue.add(url="/match", params={ "user" : user.key() })
 
 class MatchHandler(BaseHandler):
+
     def post(self):
         user_to_match = self.current_user
         if not user_to_match:
@@ -221,6 +236,9 @@ class MatchHandler(BaseHandler):
                                   second_fb_id=user.fb_id)
                 match_obj.put()
                 increment_matches_count()
+
+                logging.info("Posting to feeds")
+                self._post_to_feeds(user, user_to_match)
                 
                 logging.info("Deleting matched users")
                 db.delete(user_to_match)
@@ -275,7 +293,47 @@ class MatchHandler(BaseHandler):
                                     body=email_body,
                                     html=email_html)
         message.send()
+    
+    
+    def _post_to_feeds(self, user1, user2):
+        if not user1.post_to_feed and not user2.post_to_feed:
+            logging.info("Both users didn't allowed posting to feed, skipping post to feed")
+            return
         
+        if not user1.post_to_feed:
+            self._post_to_single_feed(user2, user1)
+        elif not user2.post_to_feed:
+            self._post_to_single_feed(user1, user2)
+        else:
+            self._post_to_both_feeds(user1, user2)
+            self._post_to_both_feeds(user2, user1)
+
+    def _post_to_single_feed(self, user1, user2):
+        logging.info("Posting to %s's feed" % (user1.name,))
+        self._post_match_to_user_feed(user1, "I just found a new friend from %s through PeaceConnector!" % 
+                                      (user2.country,))
+        
+    def _post_to_both_feeds(self, user1, user2):
+        self._post_match_to_user_feed(user1, "I was just matched with %s from %s by PeaceConnector!" % 
+                                      (user2.name, user2.country))
+    
+    def _post_match_to_user_feed(self, user, text):
+        try:
+            args = dict(access_token=user.access_token)
+    
+            base_url = 'http://' + os.environ['HTTP_HOST'] + '/'
+            post_args = dict(access_token=user.access_token,
+                             link=base_url,
+                             caption="Peace Connector",
+                             picture="%simages/facebooklink.png" % (base_url,),
+                             message=text)
+    
+            response = urllib.urlopen("https://graph.facebook.com/" + user.fb_id +"/feed?" +
+                                      urllib.urlencode(args), urllib.urlencode(post_args))
+            parsed_response = json.load(response)
+            logging.info("response for post to feed:" + str(parsed_response))
+        except Exception, ex:
+            logging.error("Exception while trying to post to feed... Will skip..." + str(ex))
     
 def main():
     util.run_wsgi_app(webapp.WSGIApplication([

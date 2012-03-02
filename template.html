@@ -307,11 +307,17 @@
 							<option value="Zimbabwe">Zimbabwe</option>
 						</select>
 						<input type="hidden" name="code" value="{{ code }}"/>
+						<input type="hidden" name="post_to_feed" value="{{ post_to_feed }}"/>
 						<input type="submit" value="Go"/>
 					</form>
 					{% else %}
-					<a id="fblogin" href="/auth/login">Log in with Facebook</a>
-					<p id="start-adventure">to start the adventure!</p>
+
+                    <form action="/auth/login" method="get">
+                        <input name="post_to_feed" type="checkbox" value="True" checked>
+                        Post to my feed when a match is found<br>
+                        <input id="fblogin" type="submit" value="Login with Facebook">
+                        <p id="start-adventure">to start the adventure!</p>
+                    </form>
 					<div id="loader"></div><div id="loaderText">Don't go anywhere...</div>
 				{% endif %} {% endif %}
 				</div>
