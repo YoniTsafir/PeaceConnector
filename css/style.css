@@ -1,5 +1,7 @@
 ﻿/* Peace Connector */
 
+@import url(http://fonts.googleapis.com/css?family=Josefin+Sans:400,700);
+
 /* CSS Resets */
 
 * {
@@ -109,7 +111,7 @@ background: #fff;
 color: #231F20;	
 padding: 0;
 overflow: hidden;
-box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+box-shadow: 0 3px 7px rgba(0,0,0,0.2);
 }
 
 header > section {
@@ -120,7 +122,7 @@ position: relative;
 
 header > section > h1 {
 position: relative;
-font-weight: bold;
+font-weight: normal;
 font-size: 48px;
 color: #464646;
 padding: 30px 0 25px;
@@ -199,8 +201,8 @@ background: url(../images/piegon-down.png) no-repeat center top;
 
 #whatwedo h2 {
 text-shadow: 0 2px 0 rgba(0,0,0,0.4), 0 5px 0 rgba(255,255,255,0.01);
-font-family: 'Dancing Script', Georgia, Times, serif;
-font-size: 56px;
+font-family: Georgia, Times, serif;
+font-size: 42px;
 line-height: 60px;
 }
 
@@ -263,8 +265,8 @@ box-shadow: 0 2px 2px rgba(0,0,0,0.4);
 }
 
 #thankyou .thankText {
-font-size: 16px;
-color: #878787;
+font-size: 18px;
+color: #656565;
 }
 
 #postToFb {
@@ -272,8 +274,8 @@ text-align: center;
 }
 
 #postToFb label {
-font-size: 14px;
-color: #808080;	
+font-size: 16px;
+color: #606060;	
 }
 
 #fblogin {
@@ -297,8 +299,8 @@ margin-top: -30px;
 
 #scene2 h2 {
 text-shadow: 0 2px 0 rgba(0,0,0,0.4), 0 5px 0 rgba(255,255,255,0.01);
-font-family: 'Dancing Script', Georgia, Times, serif;
-font-size: 56px;
+font-family: Georgia, Times, serif;
+font-size: 42px;
 line-height: 60px;	
 }
 
@@ -344,26 +346,27 @@ text-align: center;
 width: 380px;
 bottom: 25px;
 font-size: 16px;
-color: #868686;
+color: #656565;
 display: none;
 }
 
 .sceneButton {
 font-size: 36px;
-background: rgba(0,0,0,0.2);
+background: rgba(0, 0, 0, 0.2);
 border-radius: 75px;
-padding: 10px 12px;
+padding: 22px 12px;
 display: block;
-width: 20px;	
+width: 20px;
 position: absolute;
 top: 50%;
 left: auto;
 right: 10px;
-color: #fff;
+color: white;
 z-index: 999;
 margin-top: -26px;
 -webkit-transition: all 0.4s ease-in-out 0s;
 -moz-transition: all 0.4s ease-in-out 0s;
+line-height: 0;
 }
 
 .sceneButton:hover {
@@ -379,7 +382,7 @@ left: 10px;
 footer {
 margin: 0;
 background: #fff;
-box-shadow: 0 -5px 10px rgba(0,0,0,0.2);
+box-shadow: 0 -3px 5px rgba(0,0,0,0.1);
 height: 35px;
 color: #232323;
 position: relative;
@@ -387,11 +390,11 @@ z-index: 800;
 }
 
 footer div {
-padding: 8px 20px 0;
+padding: 6px 20px 0;
 margin: 0 auto;
 width: 960px;
 color: #868686;
-font-size: 14px;
+font-size: 16px;
 }
 
 footer p {
